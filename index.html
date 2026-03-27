@@ -1,107 +1,209 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Moje Směny</title>
-<style>
-    body { font-family: sans-serif; padding: 10px; background: #eee; }
-    .box { background: white; padding: 15px; border-radius: 10px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    .admin-controls { display: none; margin-bottom: 10px; padding: 10px; background: #fff9c4; border-radius: 5px; }
-    button { padding: 8px; cursor: pointer; }
-    .del { color: red; border: 1px solid red; background: none; margin-left: 5px; }
-</style>
+    <meta charset="UTF-8">
+    <style>
+        :root { --bg: #050505; --card: #111; --accent: #00ff88; --admin: #ff4d4d; --blue: #007bff; }
+        body { background: var(--bg); color: #eee; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding-top: 30px; margin: 0; }
+        
+        /* Hlavní karta */
+        .glass-card {
+            background: var(--card); width: 600px; padding: 35px; border-radius: 30px;
+            border: 1px solid #222; position: relative; box-shadow: 0 40px 80px rgba(0,0,0,0.9);
+        }
+
+        /* Tlačítko Admina */
+        .admin-toggle-btn {
+            position: absolute; top: 25px; right: 25px;
+            padding: 10px 18px; border-radius: 14px;
+            background: rgba(255, 77, 77, 0.1); border: 1px solid var(--admin);
+            color: var(--admin); cursor: pointer; font-weight: 800; font-size: 11px;
+            text-transform: uppercase; transition: 0.3s;
+        }
+        .admin-toggle-btn.logged-in { background: var(--admin); color: white; }
+
+        h1 { font-size: 42px; margin: 0; color: #fff; font-weight: 900; letter-spacing: -1px; }
+        .subtitle { color: #555; font-size: 12px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Přepínače sekcí */
+        .bubble-row { display: flex; gap: 12px; margin-bottom: 30px; }
+        .bubble {
+            background: #1a1a1a; padding: 12px 22px; border-radius: 50px;
+            border: 1px solid #333; cursor: pointer; transition: 0.3s; font-size: 14px; font-weight: 600;
+        }
+        .bubble:hover { background: #fff; color: #000; }
+
+        /* Oblast s obsahem */
+        #content-area { background: #0d0d0d; border-radius: 24px; padding: 20px; border: 1px solid #1a1a1a; min-height: 250px; }
+
+        .item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #161616; padding: 15px; border-radius: 18px; margin-bottom: 12px;
+            border-left: 5px solid #333;
+        }
+
+        /* Admin ovládání */
+        .admin-only { display: none; }
+        .is-admin .admin-only { display: flex; align-items: center; gap: 4px; }
+        
+        .btn-sm { padding: 6px 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; font-size: 11px; }
+        .btn-plus { background: #1b4d2e; color: #00ff88; }
+        .btn-minus { background: #4d1b1b; color: #ff4d4d; }
+        .btn-reset { background: #333; color: #fff; }
+        .btn-del { background: #ff4d4d; color: white; margin-left: 8px; }
+
+        /* Login Overlay */
+        #loginOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none;
+            justify-content: center; align-items: center; z-index: 100;
+        }
+        .login-box {
+            background: #111; padding: 35px; border-radius: 25px; border: 1px solid #333;
+            text-align: center; width: 300px; box-shadow: 0 0 30px rgba(255, 77, 77, 0.2);
+        }
+
+        .add-box { 
+            margin-top: 20px; padding-top: 20px; border-top: 1px solid #222;
+            display: none; flex-direction: column; gap: 10px;
+        }
+        .is-admin .add-box { display: flex; }
+        input { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 12px; outline: none; width: 85%; }
+    </style>
 </head>
 <body>
 
-<div class="box">
-    <h2>📅 Evidence směn</h2>
-
-    <div id="adminControls" class="admin-controls">
-        <input id="nameInput" placeholder="Jméno">
-        <button onclick="addPerson()">➕ Přidat</button>
-        <hr>
-        <input id="dateInput" placeholder="Datum">
-        <button onclick="addShift()">📅 Nový den</button>
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h3 id="loginTitle" style="margin-top:0">Zadejte kód</h3>
+            <input type="password" id="passInput" placeholder="****" style="text-align:center; font-size: 20px;">
+            <br><br>
+            <button class="btn-sm" style="background:#333; color:white; padding:10px 20px;" onclick="closeLogin()">Zrušit</button>
+            <button class="btn-sm" style="background:var(--accent); color:black; padding:10px 20px;" onclick="confirmAuth()">Potvrdit</button>
+        </div>
     </div>
 
-    <table id="table"></table>
+    <div class="glass-card" id="mainCard">
+        <button class="admin-toggle-btn" id="authBtn" onclick="openLogin()">Admin Přihlášení</button>
+        
+        <h1>JAVORNÁ</h1>
+        <div class="subtitle" id="roleText">Režim: Prohlížení</div>
 
-    <div style="margin-top:20px; border-top: 1px solid #ccc; padding-top: 10px;">
-        <input type="password" id="code" placeholder="Kód 1564">
-        <button onclick="unlock()">Odemknout</button>
+        <div class="bubble-row">
+            <div class="bubble" onclick="changeTab('aktivita')">🔍 Aktivita (Body)</div>
+            <div class="bubble" onclick="changeTab('smeny')">📅 Plánované směny</div>
+        </div>
+
+        <div id="content-area"></div>
+
+        <div class="add-box">
+            <input type="text" id="newName" placeholder="Jméno / Název směny...">
+            <button class="btn-sm" style="background:var(--blue); color:white; padding:12px; border-radius:12px;" onclick="addItem()">+ Přidat do databáze</button>
+        </div>
     </div>
-</div>
 
-<script>
-let people = JSON.parse(localStorage.getItem('smeny_people')) || [];
-let shifts = JSON.parse(localStorage.getItem('smeny_shifts')) || [];
-let isAdmin = false;
+    <script>
+        let isAdmin = false;
+        let currentTab = 'aktivita';
+        const MASTER_CODE = "1564";
 
-function unlock() {
-    if(document.getElementById('code').value === '1564') {
-        isAdmin = true;
-        document.getElementById('adminControls').style.display = 'block';
-        render();
-    } else { alert('Špatný kód'); }
-}
+        // Načtení dat
+        let lide = JSON.parse(localStorage.getItem('j_lide')) || [{ jmeno: "Petr", body: 0 }];
+        let smeny = JSON.parse(localStorage.getItem('j_smeny')) || [{ jmeno: "Pondělí Ranní", info: "" }];
 
-function save() {
-    localStorage.setItem('smeny_people', JSON.stringify(people));
-    localStorage.setItem('smeny_shifts', JSON.stringify(shifts));
-    render();
-}
+        function saveData() {
+            localStorage.setItem('j_lide', JSON.stringify(lide));
+            localStorage.setItem('j_smeny', JSON.stringify(smeny));
+        }
 
-function addPerson() {
-    let n = document.getElementById('nameInput').value;
-    if(n) { people.push({name: n, data: {}}); document.getElementById('nameInput').value=''; save(); }
-}
+        // --- AUTH LOGIKA ---
+        function openLogin() {
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('passInput').focus();
+            document.getElementById('loginTitle').innerText = isAdmin ? "Potvrdit odhlášení" : "Přihlášení Admina";
+        }
 
-function addShift() {
-    let d = document.getElementById('dateInput').value;
-    if(d) { shifts.push(d); document.getElementById('dateInput').value=''; save(); }
-}
+        function closeLogin() {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('passInput').value = '';
+        }
 
-function setStatus(pi, s, v) {
-    if(!isAdmin) return;
-    people[pi].data[s] = v;
-    save();
-}
+        function confirmAuth() {
+            if (document.getElementById('passInput').value === MASTER_CODE) {
+                isAdmin = !isAdmin;
+                document.getElementById('mainCard').classList.toggle('is-admin', isAdmin);
+                document.getElementById('authBtn').innerText = isAdmin ? "Odhlásit se" : "Admin Přihlášení";
+                document.getElementById('authBtn').classList.toggle('logged-in', isAdmin);
+                document.getElementById('roleText').innerText = isAdmin ? "Režim: ADMINISTRÁTOR" : "Režim: Prohlížení";
+                document.getElementById('roleText').style.color = isAdmin ? "var(--admin)" : "#555";
+                closeLogin();
+                refresh();
+            } else { alert("Špatný kód!"); closeLogin(); }
+        }
 
-function delPerson(i) { if(confirm('Smazat?')) { people.splice(i,1); save(); } }
-function delShift(i) { if(confirm('Smazat?')) { shifts.splice(i,1); save(); } }
+        // --- MANIPULACE S DATY ---
+        function changeTab(tab) { currentTab = tab; refresh(); }
 
-function render() {
-    let t = document.getElementById('table');
-    let h = `<tr><th>Jméno</th>`;
-    shifts.forEach((s, i) => h += `<th>${s}${isAdmin ? `<button class="del" onclick="delShift(${i})">x</button>` : ''}</th>`);
-    h += `<th>Σ</th></tr>`;
-    
-    let rows = people.map((p, pi) => {
-        let r = `<tr><td><strong>${p.name}</strong>${isAdmin ? `<button class="del" onclick="delPerson(${pi})">x</button>` : ''}</td>`;
-        let total = 0;
-        shifts.forEach(s => {
-            let val = p.data[s] || '';
-            if(val === 'B') total += 1;
-            if(val === 'P') total += 0.5;
-            
-            if(isAdmin) {
-                r += `<td>
-                    <button onclick="setStatus(${pi},'${s}','B')">✔</button>
-                    <button onclick="setStatus(${pi},'${s}','P')">½</button>
-                    <button onclick="setStatus(${pi},'${s}','N')">✖</button>
-                </td>`;
-            } else {
-                r += `<td>${val === 'B' ? '✅' : (val === 'P' ? '🌗' : (val === 'N' ? '❌' : '-'))}</td>`;
-            }
-        });
-        return r + `<td>${total}</td></tr>`;
-    }).join('');
-    t.innerHTML = h + rows;
-}
-render();
-</script>
+        function refresh() {
+            if(currentTab === 'aktivita') renderAktivita();
+            else renderSmeny();
+        }
+
+        function renderAktivita() {
+            let html = '<strong style="color:#666">TABULKA BODŮ:</strong><br><br>';
+            lide.forEach((osoba, i) => {
+                html += `
+                <div class="item" style="border-left-color: var(--accent)">
+                    <span>${osoba.jmeno}: <b style="color:var(--accent)">${osoba.body}</b></span>
+                    <div class="admin-only">
+                        <button class="btn-sm btn-plus" onclick="updateBody(${i}, 1)">+1</button>
+                        <button class="btn-sm btn-plus" onclick="updateBody(${i}, 2)">+2</button>
+                        <button class="btn-sm btn-minus" onclick="updateBody(${i}, -1)">-1</button>
+                        <button class="btn-sm btn-minus" onclick="updateBody(${i}, -2)">-2</button>
+                        <button class="btn-sm btn-reset" onclick="updateBody(${i}, 'reset')">0</button>
+                        <button class="btn-sm btn-del" onclick="removeItem(${i})">Smazat</button>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('content-area').innerHTML = html;
+        }
+
+        function renderSmeny() {
+            let html = '<strong style="color:#666">PLÁN SMĚN:</strong><br><br>';
+            smeny.forEach((smena, i) => {
+                html += `
+                <div class="item" style="border-left-color: var(--blue)">
+                    <span>${smena.jmeno}</span>
+                    <div class="admin-only">
+                        <button class="btn-sm btn-del" onclick="removeItem(${i})">Zrušit</button>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('content-area').innerHTML = html;
+        }
+
+        function updateBody(i, h) {
+            if(h === 'reset') lide[i].body = 0;
+            else lide[i].body += h;
+            saveData(); refresh();
+        }
+
+        function addItem() {
+            const val = document.getElementById('newName').value;
+            if(!val) return;
+            if(currentTab === 'aktivita') lide.push({ jmeno: val, body: 0 });
+            else smeny.push({ jmeno: val });
+            document.getElementById('newName').value = "";
+            saveData(); refresh();
+        }
+
+        function removeItem(i) {
+            if(currentTab === 'aktivita') lide.splice(i, 1);
+            else smeny.splice(i, 1);
+            saveData(); refresh();
+        }
+
+        refresh();
+    </script>
 </body>
 </html>
